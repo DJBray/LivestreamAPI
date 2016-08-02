@@ -58,15 +58,16 @@ app.post('/directors', function(req, res, next) {
     var id = parseInt(req.body.livestream_id);
 
     //Assert the id is a valid livestream_id
-    if(isNaN(id) || id != req.body.livestream_id || id < 0) {
-        //Error case
+    if(id === undefined || isNaN(id) || id != req.body.livestream_id || id < 0) {
         res.status(400);
-        return next('A valid livestream_id was not provided.');
+        return next(new Error('A valid livestream_id was not provided.'));
     }
 
     livestreamController.getAsJSON(id, function(err, status, data) {
-        if(err) return next(err);
-        else if(status >= 400) {
+        if(err) {
+            res.status(500);
+            return next(err);
+        } else if(status >= 400) {
             res.status(status);
             return next(data);
         }
@@ -83,7 +84,10 @@ app.post('/directors', function(req, res, next) {
             var director = new Director(data.id, data.full_name, null, null);
             directorController.createDirector(director, connection, function(err, result) {
                 connection.release;
-                if(err) return next(err);
+                if(err) {
+                    res.status(400);
+                    return next(err);
+                }
                 res.send(director);
             });
         });
@@ -105,31 +109,39 @@ app.post('/directors', function(req, res, next) {
 app.put('/directors', function(req, res, next) {
     var favoriteCamera = req.body.favorite_camera;
     var favoriteMovies = req.body.favorite_movies;
+    if(favoriteCamera === undefined || favoriteMovies === undefined) {
+        res.status(400);
+        return next(new Error('favorite_camera and favorite_movies must both be provided'));
+    }
 
     //Verify we have an authorization header and it contains a valid formatted token.
     var bearer = req.get('Authorization');
     if(bearer === null || bearer === undefined) {
         res.status(401);
-        return next('You are not authorized to use this service');
+        return next(new Error('You are not authorized to use this service'));
     }
     
     var split = bearer.split(" ");
     if(split.length !== 2 || split[0] !== "Bearer" || split[1] === '') {
         res.status(401);
-        return next('You are not authorized to use this service');
+        return next(new Error('You are not authorized to use this service'));
     }
 
     //Establish db connection    
     pool.getConnection(function(err, connection) {
         if(err) {
             connection.release();
+            res.status(500);
             return next(err);
         }
 
         //Update director object
         directorController.updateDirector(split[1], favoriteCamera, favoriteMovies, connection, function(err, director) {
             connection.release();
-            if(err) return next(err);
+            if(err) {
+                res.status(500);
+                return next(err);
+            }
             res.send(director);
         });
     });
@@ -148,25 +160,26 @@ app.get('/directors', function(req, res, next) {
     pool.getConnection(function(err, connection) {
         if(err) {
             connection.release();
+            res.status(500);
             return next(err);
         }
 
         //Get all the directors
         directorController.getDirectors(pool, function(err, directors) {
             connection.release();
-            if(err) next(err);
+            if(err) {
+                res.status(500);
+                next(err);
+            }
             res.send(directors);
         });
     });
 });
 
 app.use(function(err, req, res, next) {
-    //With more time we could improve the error handling
+    //With more time for this project we could improve the error handling
     console.error(err);
-    if(res.status < 400) {
-        res.status(500);
-    }
-    res.send(err);
+    res.send(err.message);
 });
 
 app.listen(3000, function() {
