@@ -79,7 +79,7 @@ describe("Director Controller", function() {
                 expect(val.length).toEqual(1);
                 expect(val[0].livestream_id).toEqual(director.getLivestreamId());
 
-                var hash = crypto.createHash('md5').update(directorObj.getFullName()).digest('hex');
+                var hash = crypto.createHash('md5').update(director.getFullName()).digest('hex');
                 expect(val[0].token).toEqual(hash);
                 done();
             });
@@ -122,7 +122,7 @@ describe("Director Controller", function() {
                 var data = mockDAL.getData();
                 val = data.filter(t => t.livestream_id === id);
 
-                expect(result).toEqual(val[0]);
+                expect(result).toEqual(val);
                 done();
             });
         });

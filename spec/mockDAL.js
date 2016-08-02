@@ -1,72 +1,86 @@
-(function() {
-    var crypto = require('crypto');
+/**
+ * mockDAL.js
+ * 
+ * Provides a mock of the DataAccessLayer so we can perform effective unit testing on
+ * the directorController without actually adding entries to the database.
+ */
 
-    function MockDAL(){
-        this.data = [
-            {
-                livestream_id: 123,
-                full_name: "John Smith",
-                favorite_camera: "The one on the iphone",
-                favorite_movies: "Pokemon 2000, Star Wars, Troy"
-            },
-            {
-                livestream_id: 124,
-                full_name: "Smithy Johnson",
-                favorite_camera: "I wish I actually knew cameras",
-                favorite_movies: null
-            }
-        ];
-        this.auth = [
-            {
-                livestream_id: 123,
-                token: '6117323d2cabbc17d44c2b44587f682c'
-            },
-            {
-                livestream_id: 124,
-                token: 'ea7cfe185d3272c677079ef590f09bb3'
-            }
-        ];
-    };
+var crypto = require('crypto');
 
-    MockDAL.prototype.getData = function() {
-        return this.data;
-    };
-
-    MockDAL.prototype.getAuth = function() {
-        return this.auth;
-    };
-
-    MockDAL.prototype.getAllDirectors = function(connection, callback) {
-        callback(null, this.data);
-    };
-
-    MockDAL.prototype.getDirector = function(livestreamId, connection, callback) {
-        callback(null, this.data.filter(t => t.livestreamId === livestreamId));
-    };
-
-    MockDAL.prototype.createDirector = function(directorObj, connection, callback) {
-        this.data.push(directorObj);
-    };
-
-    MockDAL.prototype.updateDirector = function(directorObj, connection, callback) {
-        var index = this.data.map(t => t.livestream_id).indexOf(directorObj.getLivestreamId());
-        if(index !== -1) {
-            this.data[index].favorite_camera = directorObj.favorite_camera;
-            this.data[index].favorite_movies = directorObj.favorite_movies;
+function MockDAL(){
+    this.data = [
+        {
+            livestream_id: 123,
+            full_name: "John Smith",
+            favorite_camera: "The one on the iphone",
+            favorite_movies: "Pokemon 2000, Star Wars, Troy"
+        },
+        {
+            livestream_id: 124,
+            full_name: "Smithy Johnson",
+            favorite_camera: "I wish I actually knew cameras",
+            favorite_movies: null
         }
-    };
+    ];
+    this.auth = [
+        {
+            livestream_id: 123,
+            token: '6117323d2cabbc17d44c2b44587f682c'
+        },
+        {
+            livestream_id: 124,
+            token: 'ea7cfe185d3272c677079ef590f09bb3'
+        }
+    ];
+};
 
-    MockDAL.prototype.getDirectorAuthToken = function(token, connection, callback) {
-        var list = this.auth.filter(t => t.token === token);
-        if(list.length > 1) callback("error: more than one with same token");
-        else if(list.length == 0) callback("error: no token found");
-        else callback(null, { livestreamId: list[0].livestream_id });
-    };
+MockDAL.prototype.getData = function() {
+    return this.data;
+};
 
-    MockDAL.prototype.createDirectorAuthToken = function(directorObj, connection, callback) {
-        var hash = crypto.createHash('md5').update(directorObj.getFullName()).digest('hex');
-        this.auth.push({ livestream_id: directorObj.livestreamId, token: hash });
-    };
+MockDAL.prototype.getAuth = function() {
+    return this.auth;
+};
 
-    module.exports = MockDAL;
-})();
+MockDAL.prototype.getAllDirectors = function(connection, callback) {
+    callback(null, this.data);
+};
+
+MockDAL.prototype.getDirector = function(livestreamId, connection, callback) {
+    callback(null, this.data.filter(t => t.livestream_id === livestreamId));
+};
+
+MockDAL.prototype.createDirector = function(directorObj, connection, callback) {
+    var obj = {
+        livestream_id: directorObj.getLivestreamId(),
+        full_name: directorObj.getFullName(),
+        favorite_camera: directorObj.getFavoriteCamera(),
+        favorite_movies: directorObj.getFavoriteMovies()
+    };
+    this.data.push(obj);
+    callback(null, directorObj);
+};
+
+MockDAL.prototype.updateDirector = function(directorObj, connection, callback) {
+    var index = this.data.map(t => t.livestream_id).indexOf(directorObj.getLivestreamId());
+    if(index !== -1) {
+        this.data[index].favorite_camera = directorObj.favorite_camera;
+        this.data[index].favorite_movies = directorObj.favorite_movies;
+    }
+    callback(null, directorObj);
+};
+
+MockDAL.prototype.getDirectorAuthToken = function(token, connection, callback) {
+    var list = this.auth.filter(t => t.token === token);
+    if(list.length > 1) callback("error: more than one with same token");
+    else if(list.length == 0) callback("error: no token found");
+    else callback(null, { livestreamId: list[0].livestream_id });
+};
+
+MockDAL.prototype.createDirectorAuthToken = function(directorObj, connection, callback) {
+    var hash = crypto.createHash('md5').update(directorObj.getFullName()).digest('hex');
+    this.auth.push({ livestream_id: directorObj.livestreamId, token: hash });
+    callback(null, directorObj);
+};
+
+module.exports = MockDAL;

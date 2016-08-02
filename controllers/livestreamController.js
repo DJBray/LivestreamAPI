@@ -1,31 +1,44 @@
-(function() {
-    var https = require("https");
+/**
+ * livestreamController.js
+ * 
+ * Provides methods to interact with the livestream API
+ */
 
-    var url = "https://api.new.livestream.com/accounts/";
+var https = require("https");
 
-    //Constructor
-    function LivestreamController() {};
+var url = "https://api.new.livestream.com/accounts/";
 
-    LivestreamController.prototype.getAsJSON = function(id, callback){
-        var request = https.get(url+id, function(res) {
-            var responseData = '';
+//Constructor
+function LivestreamController() {};
 
-            res.on('data', function(chunk) {
-                responseData += chunk;
-            });
+/**
+ * getAsJSON
+ * 
+ * Performs a GET to the livestream accounts API to find the account 
+ * with a matching livestream_id.
+ * 
+ * @param int id - The livestream_id to match against
+ * @param function(error, statusCode, response) callback - the callback function to call on error or completion.
+ */
+LivestreamController.prototype.getAsJSON = function(id, callback){
+    var request = https.get(url+id, function(res) {
+        var responseData = '';
 
-            res.on('end', function() {
-                var obj = JSON.parse(responseData);
-                callback(null, res.statusCode, obj);
-            });
+        res.on('data', function(chunk) {
+            responseData += chunk;
         });
 
-        request.on('error', function(error) {
-            callback(error);
+        res.on('end', function() {
+            var obj = JSON.parse(responseData);
+            callback(null, res.statusCode, obj);
         });
+    });
 
-        request.end();
-    };
+    request.on('error', function(error) {
+        callback(error);
+    });
 
-    module.exports = LivestreamController;
-})();
+    request.end();
+};
+
+module.exports = LivestreamController;

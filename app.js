@@ -1,8 +1,16 @@
+/**
+ * app.js
+ * 
+ * Main file for this application. Defines endpoints for creating, updating, 
+ * and getting directors and their favorite movies and/or camera.
+ */
+
 //Import 3rd party modules
 var express = require('express');
 var bodyParser = require('body-parser');
 var crypto = require('crypto');
 var mysql = require('mysql');
+var morgan = require('morgan');
 
 //Import custom classes
 var LivestreamController = require('./controllers/livestreamController.js');
@@ -28,91 +36,113 @@ var pool = mysql.createPool({
 //Begin API
 var app = express();
 
+app.use(morgan('combined'));    //Logger
 app.use(bodyParser.json());     //JSON-encoded bodies
 app.use(bodyParser.urlencoded({ //URL-encoded bodies
     extended: true
 }));
 
-//requires: livestream_id (long?)
-//1. Check db to see if user already exists, if so return error
-//2. Else do GET to https://api.new.livestream.com/accounts/:livestream_id
-//3. Read response to get full_name, favorite_camera, and favorite_movies
-//4. Write to db
-//5. Write back resposne with id, name, camera, and movies
+/**
+ * POST /directors
+ * 
+ * Creates a new director entry using the livestream_id. This endpoint 
+ * connects with livestream to validate the id is valid, gets the full_name, 
+ * and then creates a new Director object and saves it to the database. 
+ * If an account already exists with that livestream_id an error will be thrown.
+ * 
+ * @bodyparam int livestream_id - The id of the livestream account to connect with.
+ * @return Director - The director entry that was stored in the database
+ */
 app.post('/directors', function(req, res, next) {
     //Get the id from request body.
     var id = parseInt(req.body.livestream_id);
 
     //Assert the id is a valid livestream_id
-    if(!isNaN(id) && id == req.body.livestream_id && id > 0) {
-        livestreamController.getAsJSON(id, function(err, status, data) {
-            if(err) return next(err);
-            else if(status === 404) return next("Livestream account not found.");
+    if(isNaN(id) || id != req.body.livestream_id || id < 0) {
+        //Error case
+        res.status(400);
+        return next('A valid livestream_id was not provided.');
+    }
 
-            //Livestream's API verified the user's account
-            console.log("Success: " + status);
-            console.log("id: " + data.id);
-            console.log("full_name:" + data.full_name);
+    livestreamController.getAsJSON(id, function(err, status, data) {
+        if(err) return next(err);
+        else if(status >= 400) {
+            res.status(status);
+            return next(data);
+        }
 
-            //Establish db connection
-            pool.getConnection(function(err, connection) {
-                if(err) {
-                    connection.release;
-                    return next(err);
-                }
+        //Establish db connection
+        pool.getConnection(function(err, connection) {
+            if(err) {
+                connection.release;
+                res.status(500);
+                return next(err);
+            }
 
-                //Create director model from Livestream's API data and attempt to create a new director account
-                var director = new Director(data.id, data.full_name, null, null);
-                directorController.createDirector(director, connection, function(err, result) {
-                    connection.release;
-                    if(err) return next(err);
-                    res.send(director);
-                });
+            //Create director model from Livestream's API data and attempt to create a new director account
+            var director = new Director(data.id, data.full_name, null, null);
+            directorController.createDirector(director, connection, function(err, result) {
+                connection.release;
+                if(err) return next(err);
+                res.send(director);
             });
         });
-    } else {
-        //Error case
-        next('A valid livestream_id was not provided.');
-    }
+    });
 });
 
-//requires-header: Authorization: Bearer md5(fullNameOfAccountToModify)
-//1. allow change for favorite_camera and/or favorite_movies
-//2. save to db
-//3. return model containing id, full_name, favorite_camera, and favorite_movies
+/**
+ * PUT /directors
+ * 
+ * Updates an existing director in the database to update favorite_camera and favorite_movies.
+ * This endpoint requires an authorization token to be sent by the client in order to 
+ * find the director entry to update.
+ * 
+ * @header Authorization: Bearer md5(full_name)
+ * @bodyparam String favorite_camera - the updated favorite camera value
+ * @bodyparam String favorite_movies - the updated favorite movies.
+ * @return Director - The updated director entry.
+ */
 app.put('/directors', function(req, res, next) {
     var favoriteCamera = req.body.favorite_camera;
     var favoriteMovies = req.body.favorite_movies;
 
     //Verify we have an authorization header and it contains a valid formatted token.
     var bearer = req.get('Authorization');
-    if(bearer != null && bearer != undefined) {
-        var split = bearer.split(" ");
-        if(split.length === 2 && split[0] === "Bearer" && split[1] !== '') {
-
-            //Establish db connection    
-            pool.getConnection(function(err, connection) {
-                if(err) {
-                    connection.release();
-                    return next(err);
-                }
-
-                directorController.updateDirector(split[1], favoriteCamera, favoriteMovies, connection, function(err, director) {
-                    connection.release();
-                    if(err) return next(err);
-                    res.send(director);
-                });
-            });
-        } else {
-            next('You are not authorized to use this service');
-        }
-    } else {
-        next('You are not authorized to use this service');
+    if(bearer === null || bearer === undefined) {
+        res.status(401);
+        return next('You are not authorized to use this service');
     }
+    
+    var split = bearer.split(" ");
+    if(split.length !== 2 || split[0] !== "Bearer" || split[1] === '') {
+        res.status(401);
+        return next('You are not authorized to use this service');
+    }
+
+    //Establish db connection    
+    pool.getConnection(function(err, connection) {
+        if(err) {
+            connection.release();
+            return next(err);
+        }
+
+        //Update director object
+        directorController.updateDirector(split[1], favoriteCamera, favoriteMovies, connection, function(err, director) {
+            connection.release();
+            if(err) return next(err);
+            res.send(director);
+        });
+    });
 });
 
-// list all the directors registered and provide 
-//full_name, favorite_camera, and favorite_movies
+/**
+ * GET /directors
+ * 
+ * Gets a list of all the director entries in the database. Each
+ * director is returned with livestream_id, full_name, favorite_camera, and favorite_movies.
+ * 
+ * @return Array - An array of all the directors contained in the db.
+ */
 app.get('/directors', function(req, res, next) {
     //Establish db connection
     pool.getConnection(function(err, connection) {
@@ -131,12 +161,15 @@ app.get('/directors', function(req, res, next) {
 });
 
 app.use(function(err, req, res, next) {
-    //TODO make better error handling
+    //With more time we could improve the error handling
     console.error(err);
-    res.status(500).send(err);
+    if(res.status < 400) {
+        res.status(500);
+    }
+    res.send(err);
 });
 
 app.listen(3000, function() {
-    console.log('Example app listening on port 3000');
+    console.log('App listening on port 3000');
 });
 
