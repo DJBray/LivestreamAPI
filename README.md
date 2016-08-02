@@ -10,13 +10,14 @@ Prerequisites:
 
 1. Clone the repo.
 2. Open cmd / terminal to the root of this project
-3. Run the following command to create your database
+3. Run the following command to create your database (alternatively you can just copy and paste the sql 
+code into the mysql terminal).
 
-    mysql < migrations/schema.sql
+    ```mysql < migrations/schema.sql```
 
 4. Run the following command to install all npm dependencies
 
-    npm install
+    ```npm install```
 
 5. You're all set up!
 
@@ -90,7 +91,9 @@ then saves the user's authorization token.
 PUT /directors/{livestream_id}
 --------------
 Requires header: Authorization: Bearer md5(full_name)
+
 Requires 'favorite_camera' in the body. (String)
+
 Requires 'favorite_movies' in the body. (String)
 
 Updates an existing account's 'favorite_camera' 
