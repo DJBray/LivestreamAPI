@@ -63,7 +63,8 @@ app.post('/directors', function(req, res, next) {
         return next(new Error('A valid livestream_id was not provided.'));
     }
 
-    livestreamController.getAsJSON(id, function(err, status, data) {
+    //Retrieve the account info associated with this livestream id
+    livestreamController.getLivestreamAccount(id, function(err, status, data) {
         if(err) {
             res.status(500);
             return next(err);
@@ -95,18 +96,28 @@ app.post('/directors', function(req, res, next) {
 });
 
 /**
- * PUT /directors
+ * PUT /directors/:livestreamId
  * 
  * Updates an existing director in the database to update favorite_camera and favorite_movies.
  * This endpoint requires an authorization token to be sent by the client in order to 
- * find the director entry to update.
+ * find the director entry to update. favorite_movies is expected as a text field just for the sake of 
+ * simplicity for this project.
  * 
+ * @urlparam int livestreamId - The livestream id of the account to modify.
  * @header Authorization: Bearer md5(full_name)
  * @bodyparam String favorite_camera - the updated favorite camera value
  * @bodyparam String favorite_movies - the updated favorite movies.
  * @return Director - The updated director entry.
  */
-app.put('/directors', function(req, res, next) {
+app.put('/directors/:livestream_id', function(req, res, next) {
+    var livestreamId = parseInt(req.params.livestream_id);
+    //Assert the id is a valid livestream_id
+    if(livestreamId === undefined || isNaN(livestreamId) || livestreamId != req.params.livestream_id || livestreamId < 0) {
+        res.status(400);
+        return next(new Error('A valid livestream_id was not provided.'));
+    }
+
+    //Assert the favorite camera and the favorite movies were provided
     var favoriteCamera = req.body.favorite_camera;
     var favoriteMovies = req.body.favorite_movies;
     if(favoriteCamera === undefined || favoriteMovies === undefined) {
@@ -136,7 +147,7 @@ app.put('/directors', function(req, res, next) {
         }
 
         //Update director object
-        directorController.updateDirector(split[1], favoriteCamera, favoriteMovies, connection, function(err, director) {
+        directorController.updateDirector(livestreamId, split[1], favoriteCamera, favoriteMovies, connection, function(err, director) {
             connection.release();
             if(err) {
                 res.status(500);

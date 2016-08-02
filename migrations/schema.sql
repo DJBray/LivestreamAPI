@@ -11,14 +11,3 @@ CREATE TABLE LiveStreamAPI.directors (
 
     PRIMARY KEY(livestream_id)
 ) ENGINE=InnoDB;
-
-CREATE TABLE LiveStreamAPI.authorization (
-    livestream_id INT NOT NULL,
-    token VARCHAR(200) NOT NULL,
-
-    PRIMARY KEY(livestream_id),
-    FOREIGN KEY(livestream_id)
-        REFERENCES LiveStreamAPI.directors(livestream_id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-) ENGINE=InnoDB;

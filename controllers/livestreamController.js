@@ -12,7 +12,7 @@ var url = "https://api.new.livestream.com/accounts/";
 function LivestreamController() {};
 
 /**
- * getAsJSON
+ * getLivestreamAccount
  * 
  * Performs a GET to the livestream accounts API to find the account 
  * with a matching livestream_id.
@@ -20,7 +20,7 @@ function LivestreamController() {};
  * @param int id - The livestream_id to match against
  * @param function(error, statusCode, response) callback - the callback function to call on error or completion.
  */
-LivestreamController.prototype.getAsJSON = function(id, callback){
+LivestreamController.prototype.getLivestreamAccount = function(id, callback){
     var request = https.get(url+id, function(res) {
         var responseData = '';
 

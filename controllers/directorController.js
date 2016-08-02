@@ -19,8 +19,7 @@ function DirectorController(dataAccessLayer) {
  * createDirector
  * 
  * Creates a new director in the database if one doesn't already exist with 
- * that livestreamId. When a director is created, an auth token is generated for
- * that director from an md5 hash and is stored seperately in the database.
+ * that livestream id. Otherwise an error is returned.
  * 
  * @param Director director - The Director object to parse and insert into the database
  * @param connection - The database connection to use for this transaction
@@ -37,10 +36,7 @@ DirectorController.prototype.createDirector = function(director, connection, cal
             callback(new Error('A director already exists with that livestreamId'));
         } else {                
             //Otherwise create the director and add his auth token to the database.
-            self.dal.createDirector(director, connection, function(err, result) {
-                if(err) return callback(err);
-                self.dal.createDirectorAuthToken(director, connection, callback);
-            });
+            self.dal.createDirector(director, connection, callback);
         }
     });
 };
@@ -49,22 +45,23 @@ DirectorController.prototype.createDirector = function(director, connection, cal
  * updateDirector
  * 
  * Updates a director's favorite movies and favorite camera. Using the provided token,
- * a query is done on the database to find the account with the matching livestream_id.
+ * a query is done on the database to find the account with the matching livestream id.
  * If an entry is not found with a matching token then the user is not authorized to
  * modify a director and an error is thrown.
  * 
+ * @param int livestreamId - The livestream id of the account to update
  * @param String token - The md5(full_name) used to determine which director account to update
  * @param String favoriteCamera - The favorite camera to update
  * @param String favoriteMovies - The favorite movies to update
  * @param connection - The database connection to use for this transaction
  * @param function(error, Director result) callback - The callback function to execute on completion or error
  */
-DirectorController.prototype.updateDirector = function(token, favoriteCamera, favoriteMovies, connection, callback) {
+DirectorController.prototype.updateDirector = function(livestreamId, token, favoriteCamera, favoriteMovies, connection, callback) {
     var self = this;
-    self.dal.getDirectorAuthToken(token, connection, function(err, result) {
+    self.dal.getDirectorAuthToken(livestreamId, token, connection, function(err, result) {
         if(err) return callback(err);
         //else if(result.livestreamId !== director.getLivestreamId()) return callback('You are not authorized to modify that account.');
-        var director = new Director(result.livestreamId, null, favoriteCamera, favoriteMovies);
+        var director = new Director(result.livestreamId, result.fullName, favoriteCamera, favoriteMovies);
         self.dal.updateDirector(director, connection, function(err, result) {
             if(err) return callback(err);
             self.dal.getDirector(director.getLivestreamId(), connection, callback);

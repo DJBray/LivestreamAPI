@@ -64,65 +64,57 @@ describe("Director Controller", function() {
                 done();
             });
         });
-
-        it("adds an auth token when a new director is created", function(done) {
-            var mockDAL = new MockDAL();
-            var director = new Director(12, "Adam", null, null);
-            var directorController = new DirectorController(mockDAL);
-            directorController.createDirector(director, mockConnection, function(err, result) {
-                expect(err).toBeNull();
-                expect(result).toEqual(director);
-
-                var auth = mockDAL.getAuth();
-                var val = auth.filter(t => t.livestream_id === director.getLivestreamId());
-
-                expect(val.length).toEqual(1);
-                expect(val[0].livestream_id).toEqual(director.getLivestreamId());
-
-                var hash = crypto.createHash('md5').update(director.getFullName()).digest('hex');
-                expect(val[0].token).toEqual(hash);
-                done();
-            });
-        });
     });
 
     describe('updateDirector', function() {
-        it('requires the token to match an entry in the auth table', function(done) {
+        it('requires the token to match before changing anything', function(done) {
+            var livestreamId = 123;
             var mockDAL = new MockDAL();
             var token = 'asdf';
             var favoriteCamera = 'Meh';
             var favoriteMovies = 'bleh';
+            var origRow = mockDAL.getData().filter(t => t.livestream_id === livestreamId)[0];
             var directorController = new DirectorController(mockDAL);
-            directorController.updateDirector(token, favoriteCamera, favoriteMovies, mockConnection, function(err, result) {
+            directorController.updateDirector(livestreamId, token, favoriteCamera, favoriteMovies, mockConnection, function(err, result) {
                 expect(err).not.toBeNull();
                 expect(result).toBeUndefined();
-                //TODO check the md5 and fix the auth filter below
                 
-                var auth = mockDAL.getAuth();
-                var val = auth.filter(t => t.favorite_camera === favoriteCamera || t. favorite_movies === favoriteMovies);
+                var data = mockDAL.getData();
+                var val = data.filter(t => t.livestream_id === livestreamId);
+                expect(val.length).toBe(1);
+                val = val[0];
 
-                expect(val.length).toEqual(0);
+                var hash = crypto.createHash('md5').update(val.full_name).digest('hex');
+                expect(hash).not.toEqual(token);
+
+                expect(val.favorite_camera).not.toEqual(favoriteCamera);
+                expect(val.favorite_movies).not.toEqual(favoriteMovies);
+                expect(val.favorite_camera).toEqual(origRow.favorite_camera);
+                expect(val.favorite_movies).toEqual(origRow.favorite_movies);
                 done();
             });
         });
 
-        it('updates favorite camera and favorite movies', function(done) {
+        it('updates favorite camera and favorite movies when tokens match', function(done) {
+            var livestreamId = 123;
             var mockDAL = new MockDAL();
             var token = '6117323d2cabbc17d44c2b44587f682c';
             var favoriteCamera = 'meh';
             var favoriteMovies = 'bleh';
             var directorController = new DirectorController(mockDAL);
-            directorController.updateDirector(token, favoriteCamera, favoriteMovies, mockConnection, function(err, result) {
+            directorController.updateDirector(livestreamId, token, favoriteCamera, favoriteMovies, mockConnection, function(err, result) {
                 expect(err).toBeNull();
-
-                var auth = mockDAL.getAuth();
-                var val = auth.filter(t => t.token === token);
-                var id = val[0].livestream_id;
-
+                
                 var data = mockDAL.getData();
-                val = data.filter(t => t.livestream_id === id);
+                var val = data.filter(t => t.livestream_id === livestreamId);
+                expect(val.length).toBe(1);
+                val = val[0];
 
-                expect(result).toEqual(val);
+                var hash = crypto.createHash('md5').update(val.full_name).digest('hex');
+                expect(hash).toEqual(token);
+
+                expect(val.favorite_camera).toEqual(favoriteCamera);
+                expect(val.favorite_movies).toEqual(favoriteMovies);
                 done();
             });
         });

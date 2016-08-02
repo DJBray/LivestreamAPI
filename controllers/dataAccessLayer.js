@@ -86,40 +86,24 @@ DataAccessLayer.prototype.updateDirector = function(directorObj, connection, cal
 /**
  * getDirectorAuthToken
  * 
- * Queries the database for the director with the matching auth token and return's that
- * director's livestream_id.
+ * Queries the database for the director with the matching livestream id, computes the md5
+ * of the account's full_name and then compares it against the token. If they match then the
+ * account's livestream id and full name are returned, otherwise an error is returned.
  * 
+ * @param int livestreamId - The livestream id of the account to update
  * @param String token - The token to match in the database.
  * @param connection - The database connection to use for the query
  * @param function(err, results) callback - The callback function to use for this query
  */
-DataAccessLayer.prototype.getDirectorAuthToken = function(token, connection, callback) {
-    var getAuthTokenQuery = 'SELECT livestream_id as livestreamId FROM authorization WHERE token = ?';
-    connection.query(getAuthTokenQuery, token, function(err, results) {
+DataAccessLayer.prototype.getDirectorAuthToken = function(livestreamId, token, connection, callback) {
+    var getAuthTokenQuery = 'SELECT livestream_id as livestreamId, full_name as fullName FROM directors WHERE livestream_id = ?';
+    connection.query(getAuthTokenQuery, livestreamId, function(err, results) {
         if(err) return callback(err);
         else if(results.length == 0) return callback(new Error('You are not authorized to use this service.'));
         else if(results.length > 1) return callback(new Error('Internal error occurred, violation of database integrity'));
+        var hash = crypto.createHash('md5').update(results[0].fullName).digest('hex');
+        if(token !== hash) return callback(new Error('You are not authorized to use this service.'));
         callback(null, results[0]);
-    });
-};
-
-/**
- * createDirectorAuthToken
- * 
- * Precondition: No entry exists with the same livestream_id
- * 
- * Computes the md5 of a director's full_name to form that user's token.
- * The token and the director's livestream_id is then added into the database.
- * 
- * @param Director directorObj - The Director to be used to add a new auth entry.
- * @param connection - The database connection to use for the query
- * @param function(err, results) callback - The callback function to use for this query
- */
-DataAccessLayer.prototype.createDirectorAuthToken = function(directorObj, connection, callback) {
-    var hash = crypto.createHash('md5').update(directorObj.getFullName()).digest('hex');
-    var authQuery = 'INSERT INTO authorization(livestream_id, token) VALUES(?,?);';
-    connection.query(authQuery, [directorObj.getLivestreamId(), hash], function(error, results) {
-        callback(error, results);
     });
 };
 
