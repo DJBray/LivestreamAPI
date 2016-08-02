@@ -8,10 +8,11 @@ var mysql = require('mysql');
 var LivestreamController = require('./controllers/livestreamController.js');
 var DirectorController = require('./controllers/directorController');
 var Director = require('./models/director.js');
+var DataAccessLayer = require('./controllers/dataAccessLayer.js');
 
 //Create instantiations
 var livestreamController = new LivestreamController();
-var directorController = new DirectorController();
+var directorController = new DirectorController(new DataAccessLayer());
 
 //In a production environment we would securely store these credentials
 //in a separate file and keep it out of git but we're not going to do that
@@ -46,6 +47,7 @@ app.post('/directors', function(req, res, next) {
     if(!isNaN(id) && id == req.body.livestream_id && id > 0) {
         livestreamController.getAsJSON(id, function(err, status, data) {
             if(err) return next(err);
+            else if(status === 404) return next("Livestream account not found.");
 
             //Livestream's API verified the user's account
             console.log("Success: " + status);
@@ -131,7 +133,7 @@ app.get('/directors', function(req, res, next) {
 app.use(function(err, req, res, next) {
     //TODO make better error handling
     console.error(err);
-    res.status(500).send('Something broke!');
+    res.status(500).send(err);
 });
 
 app.listen(3000, function() {
